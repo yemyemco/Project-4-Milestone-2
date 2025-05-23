@@ -1,3 +1,4 @@
+//Database for enrollment of students
 const mongoose = require("mongoose");
 const enrollmentSchema = new mongoose.Schema({
     matricNo: {type: String, require: true},
