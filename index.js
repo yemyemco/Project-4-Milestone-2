@@ -11,7 +11,7 @@ const verifyToken = require("./middleware/auth");
 const mongoose = require("mongoose");
 const userdb = require("./userDB");
 const coursedb = require("./courseDB");
-const enrollDB = require("./enrollment");
+const enrollDB = require("./enrollmentDB");
 const db_URL = process.env.DB_URL;
 
 //Connect to mongoDB
