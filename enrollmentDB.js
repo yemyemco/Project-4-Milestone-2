@@ -1,17 +1,33 @@
-const mongoose = require("mongoose");
-const enrollmentSchema = new mongoose.Schema({
-    matricNo: {type: String, require: true},
-    firstName: {type: String, require: true}, 
-    lastName: {type: String, require: true},
-    level: {type: Number, require: true},
-    email: {type: String, require: true},
-    course_code: {type: String, require: true},
-    course_title: {type: String, require: true},
-    course_unit: {type: String, require: true},
-    course_semester: {type: String, require: true}
-},
-{timestamps: true}
-);
+const jwt = require("jsonwebtoken");
+const userdb = require("../userDB");
+const config = process.env;
 
-const enrollDB = new mongoose.model("enrollDB", enrollmentSchema);
-module.exports = enrollDB;
+//Verify user's token   
+const verifyToken = async (req, res, next)=>
+{
+    try {
+    let getToken = req.headers["x-access-token"] || req.header("Authorisation") || req.body.token || req.query.token;
+
+    if(!getToken)
+    {
+        res.redirect('/sign-in');
+    }
+        
+        //Verify token
+        getToken = jwt.verify(getToken, config.ACCESS_TOKEN);
+
+        return next();
+
+    } catch (error) {
+        if(error.message == "jwt expired")
+        {
+            return res.status(400).json({Message: "Session expired. Please log in again"});
+        }
+        else
+        {
+            return res.status(400).json({Message: "Encountered error: " + error.message});
+        }
+    }
+}    
+
+module.exports = verifyToken;
