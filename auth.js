@@ -10,7 +10,7 @@ const verifyToken = async (req, res, next)=>
 
     if(!getToken)
     {
-        res.redirect('/sign-in');
+        return res.status(400).json({Message: "Token error: Log in again"});
     }
         
         //Verify token
