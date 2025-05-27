@@ -5,6 +5,7 @@ server.use(express.json());    //Use json for handling files
 const PORT = process.env.PORT;
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const verifyToken = require("./middleware/auth");
 
 //MongoDB
 const mongoose = require("mongoose");
@@ -41,10 +42,19 @@ server.post("/sign-up", async (req, res)=>
         
         //Encrypt (hash) password
         const encryptedpassword = await bcrypt.hash(pass, 12);
-        const user = await new userdb({firstName, lastName, email, pass: encryptedpassword}); 
+
+        //Create token for the new user
+        const token = jwt.sign({
+            email},
+            process.env.ACCESS_TOKEN,
+            {expiresIn: "1h"});
+
+        const user = await new userdb({firstName, lastName, email: email.toLowerCase(), pass: encryptedpassword, token: token}); 
         await user.save();  //Save new user's details
-        res.status(201).json({Message: "Success! " + user.firstName + ", your account has been created"
-        });
+            
+            //Return the new user
+             res.status(201).json(
+                {Message: "Success! " + user.firstName + ", your account has been created" + user});
     }
     catch(error)
     {
@@ -78,12 +88,12 @@ server.post("/sign-in", async (req, res)=>
                     const accessToken = await jwt.sign(
                     {email: foundUser?.email}, 
                     process.env.ACCESS_TOKEN,
-                    {expiresIn: "3d"});
+                    {expiresIn: "1h"});
 
                     const refreshToken = await jwt.sign(
                     {email: foundUser?.email}, 
                     process.env.REFRESH_TOKEN,
-                    {expiresIn: "7d"});
+                    {expiresIn: "2h"});
 
                     res.status(200).json({Message: "Success! Welcome " + foundUser.firstName,
                         AccessToken: accessToken
@@ -102,22 +112,35 @@ server.post("/sign-in", async (req, res)=>
 });
 
 //API for creating or adding courses
-server.post("/addCourse", async (req, res)=>
+server.post("/addCourse", verifyToken, async (req, res)=>
 {
     try {
         //Check input
-        const {code, title, unit, semester} = req.body;
+        const {email, code, title, unit, semester} = req.body;
         
-        if (!code || !title || !unit || !semester)
+        if (!email || !code || !title || !unit || !semester)
         {
             return res.status(400).json({Message: "Error! All fields required"});
         }
         
+        //Check user's role
+        const user = await userdb.findOne({email});
+        
+        if(!user)
+        {
+            return res.status(400).json({Message: "Error: Wrong user"});
+        }
+        
+        if (user.role != "instructor")
+        {
+            return res.status(400).json({Message: "Error: Unauthorised operation"});
+        }
+
         //Check if course already exists
         const findCourse = await coursedb.findOne({code});
         if (findCourse)
         {
-            res.status(403).json({Message: "Forbidden! " + code + " already exists"});
+            return res.status(403).json({Message: "Forbidden! " + code + " already exists"});
         }
 
         //Save course to database
@@ -125,15 +148,15 @@ server.post("/addCourse", async (req, res)=>
         await course.save();
         res.status(201).json({Message: "Success! " + course.code + " has been created."});
     } catch (error) {
-        return res.status(400).json({Message: "Oops! Something went wrong"});
+        return res.status(400).json({Message: "Oops! Something went wrong" + error.message});
     }
-})
+});
 
 //Project Milestone 2
 //API for viewing all available courses
 server.get("/get-all-courses", async (req, res)=>
 {
-    const allCourses = await coursedb.find();
+    const allCourses = await coursedb.find({}, {code: 1, title: 1, unit: 1, semester: 1, _id: 0});
     if(!allCourses)
     {
         return res.status(404).json({Message: "Sorry! No course found"});
